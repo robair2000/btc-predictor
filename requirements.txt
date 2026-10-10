@@ -5,3 +5,5 @@ scikit-learn
 xgboost
 yfinance
 pyarrow
+requests
+pytrends
