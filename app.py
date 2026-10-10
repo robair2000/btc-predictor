@@ -45,15 +45,17 @@ def load_bitcoin_data():
   return df
 
 
-# 100% Realtime actuele prijs rechtstreeks van Binance (zonder cache of vertraging)
+# Veilige ophaalfunctie voor Binance live prijs met fallback
 def fetch_realtime_binance_price():
   try:
     url = 'https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT'
-    response = requests.get(url, timeout=3)
+    response = requests.get(url, timeout=5)
     data = response.json()
-    return float(data.get('price', 0.0))
+    if 'price' in data:
+      return float(data['price'])
   except Exception:
-    return None
+    pass
+  return None
 
 
 def add_technical_indicators(df):
@@ -182,12 +184,12 @@ with st.spinner(
   current_mempool_fee = fetch_mempool_fees()
   current_funding_rate = fetch_binance_funding_rate()
 
-  # Haal de echte realtime Binance prijs op, val terug op dataframe indien API faalt
+  # Bepaal huidige prijs veilig (Binance API met fallback naar dataframe)
   realtime_price = fetch_realtime_binance_price()
-  if realtime_price is not None:
+  if realtime_price is not None and realtime_price > 0:
     current_price = realtime_price
   else:
-    current_price = df['close'].iloc[-1]
+    current_price = float(df['close'].iloc[-1])
 
   # Kenmerken toevoegen
   np.random.seed(42)
@@ -216,7 +218,6 @@ n_estimators = st.sidebar.slider(
 )
 max_depth = st.sidebar.slider('Maximale Boomdiepte (max_depth)', 3, 10, 3)
 
-# Uitgebreide lijst met features
 features = [
     'close',
     'open',
@@ -251,7 +252,7 @@ score = model.score(X_test, y_test)
 
 # --- DASHBOARD WEERGAVE ---
 col1, col2, col3, col4 = st.columns(4)
-col1.metric('Huidige BTC Koers (Live)', f'${current_price:,.2f}')
+col1.metric('Huidige BTC Koers', f'${current_price:,.2f}')
 col2.metric('Model Score ($R^2$)', f'{score:.2f}')
 col3.metric('Bitcoin Dominance', f'{current_btc_dom:.1f}%')
 col4.metric('Mempool Fee (Fast)', f'{current_mempool_fee} sat/vB')
@@ -286,16 +287,16 @@ col_a.metric(
 if predicted_price > current_price:
   col_b.success(
       f'**Verwachting: STIJGING 📈**\n\nHet model verwacht een hogere BTC-koers'
-      f' morgen t.o.v. de live prijs (${price_diff:+,.2f}).'
+      f' morgen (${price_diff:+,.2f}).'
   )
 else:
   col_b.warning(
       f'**Verwachting: DALING 📉**\n\nHet model verwacht een lagere BTC-koers'
-      f' morgen t.o.v. de live prijs (${price_diff:+,.2f}).'
+      f' morgen (${price_diff:+,.2f}).'
   )
 
 st.info(
-    '💡 *De actuele koers wordt nu direct seconde-naukeurig uitgelezen via de'
-    ' live Binance API, terwijl het model traint op historische data, live'
-    ' sentiment, dominantie, mempool fees en funding rates.*'
+    '💡 *De koers gebruikt nu een automatische beveiliging: als de live API'
+    ' even hapert, pakt het systeem direct de betrouwbare laatst bekende koers'
+    ' in plaats van 0.0.*'
 )
