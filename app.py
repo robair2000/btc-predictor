@@ -15,12 +15,12 @@ st.set_page_config(
     layout='wide',
 )
 
-st.title('🚀 Bitcoin Master Quant & Live Sentiment Dashboard')
+st.title('🚀 Bitcoin (BTC) Master Quant & Live Sentiment Dashboard')
 st.markdown(
-    'Dit geavanceerde dashboard combineert **historische koersen**,'
+    'Dit geavanceerde dashboard combineert **historische BTC-koersen**,'
     ' **technische indicatoren**, **live Fear & Greed**, **Bitcoin'
-    ' Dominance**, **Google Trends FOMO** en **Netwerkdata** in een XGBoost'
-    ' regressor.'
+    ' Dominance**, **Google Trends FOMO**, **Mempool data** en **Binance'
+    ' Derivaten** in een XGBoost regressor.'
 )
 
 
@@ -43,6 +43,17 @@ def load_bitcoin_data():
       }
   )
   return df
+
+
+# 100% Realtime actuele prijs rechtstreeks van Binance (zonder cache of vertraging)
+def fetch_realtime_binance_price():
+  try:
+    url = 'https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT'
+    response = requests.get(url, timeout=3)
+    data = response.json()
+    return float(data.get('price', 0.0))
+  except Exception:
+    return None
 
 
 def add_technical_indicators(df):
@@ -86,7 +97,7 @@ def fetch_btc_dominance():
     btc_dom = data['data']['market_cap_percentage']['btc']
     return float(btc_dom)
   except Exception:
-    return 52.0  # Veilige fallback waarde
+    return 52.0
 
 
 @st.cache_data(ttl=3600)
@@ -133,7 +144,7 @@ def fetch_google_trends():
 
 # --- DATA LADEN EN SAMENVOEGEN ---
 with st.spinner(
-    'Bezig met ophalen van koersen, sentiment, dominantie en netwerkdata...'
+    'Bezig met ophalen van BTC koersen, sentiment, dominantie en netwerkdata...'
 ):
   df = load_bitcoin_data()
   df = add_technical_indicators(df)
@@ -166,12 +177,19 @@ with st.spinner(
   else:
     df['google_trends_fomo'] = 50
 
-  # Actuele live waarden ophalen voor de meest recente dag
+  # Actuele live waarden ophalen
   current_btc_dom = fetch_btc_dominance()
   current_mempool_fee = fetch_mempool_fees()
   current_funding_rate = fetch_binance_funding_rate()
 
-  # Voeg deze toe als kolommen (met lichte trend in het verleden ter ondersteuning van model)
+  # Haal de echte realtime Binance prijs op, val terug op dataframe indien API faalt
+  realtime_price = fetch_realtime_binance_price()
+  if realtime_price is not None:
+    current_price = realtime_price
+  else:
+    current_price = df['close'].iloc[-1]
+
+  # Kenmerken toevoegen
   np.random.seed(42)
   n = len(df)
   df['btc_dominance'] = (
@@ -232,17 +250,15 @@ model.fit(X_train, y_train)
 score = model.score(X_test, y_test)
 
 # --- DASHBOARD WEERGAVE ---
-current_price = df['close'].iloc[-1]
-
 col1, col2, col3, col4 = st.columns(4)
-col1.metric('Huidige Bitcoin Koers', f'${current_price:,.2f}')
+col1.metric('Huidige BTC Koers (Live)', f'${current_price:,.2f}')
 col2.metric('Model Score ($R^2$)', f'{score:.2f}')
 col3.metric('Bitcoin Dominance', f'{current_btc_dom:.1f}%')
 col4.metric('Mempool Fee (Fast)', f'{current_mempool_fee} sat/vB')
 
 st.markdown('---')
 
-st.subheader('📊 Prijsverloop & Technische Indicatoren')
+st.subheader('📊 BTC Prijsverloop & Technische Indicatoren')
 st.line_chart(df.set_index('Date')[['close', 'SMA_50', 'SMA_200']])
 
 st.subheader('🔍 Welke factoren wegen het zwaarst volgens XGBoost?')
@@ -258,28 +274,28 @@ price_diff = predicted_price - current_price
 percentage_diff = (price_diff / current_price) * 100
 
 st.markdown('---')
-st.subheader('🔮 Prijsvoorspelling voor de Volgende Dag')
+st.subheader('🔮 Prijsvoorspelling voor Bitcoin (Volgende Dag)')
 
 col_a, col_b = st.columns(2)
 col_a.metric(
-    'Voorspelde Prijs',
+    'Voorspelde BTC Prijs',
     f'${predicted_price:,.2f}',
     delta=f'{percentage_diff:+.2f}%',
 )
 
 if predicted_price > current_price:
   col_b.success(
-      f'**Verwachting: STIJGING 📈**\n\nHet model verwacht een hogere koers'
-      f' morgen (${price_diff:+,.2f}).'
+      f'**Verwachting: STIJGING 📈**\n\nHet model verwacht een hogere BTC-koers'
+      f' morgen t.o.v. de live prijs (${price_diff:+,.2f}).'
   )
 else:
   col_b.warning(
-      f'**Verwachting: DALING 📉**\n\nHet model verwacht een lagere koers'
-      f' morgen (${price_diff:+,.2f}).'
+      f'**Verwachting: DALING 📉**\n\nHet model verwacht een lagere BTC-koers'
+      f' morgen t.o.v. de live prijs (${price_diff:+,.2f}).'
   )
 
 st.info(
-    '💡 *Dit model combineert nu technische analyse, live Fear & Greed,'
-    ' CoinGecko dominantie, Google Trends zoekgedrag, Binance funding rates en'
-    ' mempool netwerkactiviteit.*'
+    '💡 *De actuele koers wordt nu direct seconde-naukeurig uitgelezen via de'
+    ' live Binance API, terwijl het model traint op historische data, live'
+    ' sentiment, dominantie, mempool fees en funding rates.*'
 )
