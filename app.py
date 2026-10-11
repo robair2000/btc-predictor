@@ -250,12 +250,16 @@ model = xgb.XGBRegressor(
 model.fit(X_train, y_train)
 score = model.score(X_test, y_test)
 
+# Huidige tijd ophalen voor controle
+laatste_update = datetime.now().strftime('%H:%M:%S (%d-%m-%Y)')
+
 # --- DASHBOARD WEERGAVE ---
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 col1.metric('Huidige BTC Koers', f'${current_price:,.2f}')
 col2.metric('Model Score ($R^2$)', f'{score:.2f}')
 col3.metric('Bitcoin Dominance', f'{current_btc_dom:.1f}%')
 col4.metric('Mempool Fee (Fast)', f'{current_mempool_fee} sat/vB')
+col5.metric('Laatste Model Update', laatste_update)
 
 st.markdown('---')
 
