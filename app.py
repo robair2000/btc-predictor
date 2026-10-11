@@ -298,3 +298,11 @@ if predicted_price > current_price:
 else:
   col_b.warning(
       f'**Verwachting: DALING 📉**\n\nHet model verwacht een lagere BTC-koers'
+      f' morgen (${price_diff:+,.2f}).'
+  )
+
+st.info(
+    '💡 *De koers gebruikt nu een automatische beveiliging: als de live API'
+    ' even hapert, pakt het systeem direct de betrouwbare laatst bekende koers'
+    ' in plaats van 0.0.*'
+)
