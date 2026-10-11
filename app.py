@@ -250,12 +250,23 @@ model = xgb.XGBRegressor(
 model.fit(X_train, y_train)
 score = model.score(X_test, y_test)
 
-# --- DASHBOARD WEERGAVE ---
-col1, col2, col3, col4 = st.columns(4)
-col1.metric('Huidige BTC Koers', f'${current_price:,.2f}')
+# --- DASHBOARD UI ---
+realtime_price = fetch_realtime_binance_price()
+current_price = realtime_price if realtime_price else float(df['close'].iloc[-1])
+current_atr = float(df['ATR'].iloc[-1])
+is_mtf_bullish = bool(df['mtf_trend_bullish'].iloc[-1])
+
+# Huidige tijd ophalen voor de 'laatste update'
+laatste_update = datetime.now().strftime('%H:%M:%S (%d-%m-%Y)')
+
+col1, col2, col3, col4, col5 = st.columns(5)
+col1.metric('Huidige LINK Koers', f'${current_price:,.3f}')
 col2.metric('Model Score ($R^2$)', f'{score:.2f}')
-col3.metric('Bitcoin Dominance', f'{current_btc_dom:.1f}%')
-col4.metric('Mempool Fee (Fast)', f'{current_mempool_fee} sat/vB')
+col3.metric('Directional Win-Rate', f'{directional_acc:.1f}%')
+col4.metric(
+    'Daily Trend Filter', '🟢 BULLISH' if is_mtf_bullish else '🔴 BEARISH'
+)
+col5.metric('Laatste Model Update', laatste_update)
 
 st.markdown('---')
 
