@@ -10,14 +10,14 @@ import yfinance as yf
 from sklearn.model_selection import train_test_split
 
 st.set_page_config(
-    page_title='Institutional Crypto Quant Scalper', layout='wide'
+    page_title='BTC Daily Quant Predictor (Real Data)', layout='wide'
 )
 
 
 # --- DATA & INDICATOR FUNCTIES ---
 @st.cache_data(ttl=900)
 def load_market_data(ticker_symbol):
-  df = yf.download(ticker_symbol, period='60d', interval='15m', progress=False)
+  df = yf.download(ticker_symbol, period='2y', interval='1d', progress=False)
   if df.empty:
     return None
   if isinstance(df.columns, pd.MultiIndex):
@@ -65,7 +65,6 @@ def add_advanced_indicators(df):
   rs = gain / loss
   df['RSI'] = 100 - (100 / (1 + rs))
 
-  df['taker_buy_ratio'] = 0.5 + (df['close'].pct_change() * 2)
   return df
 
 
@@ -90,23 +89,21 @@ def fetch_realtime_price(symbol):
 
 
 # --- HOOFDTITEL & SIDEBAR ---
-st.title('⚡ Institutional Quant Scalping Platform')
+st.title('⚡ Bitcoin (BTC) Daily Quant Prediction Dashboard')
 
 st.sidebar.header('⚙️ Model & Strategie Instellingen')
-selected_asset = st.sidebar.selectbox(
-    'Selecteer Asset', ['LINK-USD', 'BTC-USD'], index=0
-)
-binance_symbol = 'LINKUSDT' if 'LINK' in selected_asset else 'BTCUSDT'
+selected_asset = 'BTC-USD'
+binance_symbol = 'BTCUSDT'
 
 test_size = st.sidebar.slider(
     'Test / Train Splitsing (%)', 10, 40, 20, step=5
-)  # Vaste standaard 20
+)  # Standaard 20
 n_estimators = st.sidebar.slider(
     'XGBoost Bomen (n_estimators)', 50, 300, 150
-)  # Vaste standaard 150
+)  # Standaard 150
 max_depth = st.sidebar.slider(
     'Maximale Boomdiepte (max_depth)', 3, 10, 4
-)  # Vaste standaard 4
+)  # Standaard 4
 
 st.sidebar.markdown('---')
 st.sidebar.subheader('🤖 Notificatie / Webhook')
@@ -115,13 +112,13 @@ send_alert = st.sidebar.button('Stuur Signaal Test')
 
 if send_alert and webhook_url:
   try:
-    requests.post(webhook_url, json={'content': 'Test signaal vanuit Quant Bot!'})
+    requests.post(webhook_url, json={'content': 'Test signaal vanuit BTC Quant Bot!'})
     st.sidebar.success('Test notificatie verzonden!')
   except Exception as e:
     st.sidebar.error(f'Fout bij verzenden: {e}')
 
 # --- DATA LADEN & PREPAREREN ---
-with st.spinner(f'Laden van {selected_asset} marktdata...'):
+with st.spinner(f'Laden van {selected_asset} dagelijkse marktdata...'):
   df = load_market_data(selected_asset)
   if df is None or df.empty:
     st.error('Kon geen data laden.')
@@ -132,13 +129,13 @@ with st.spinner(f'Laden van {selected_asset} marktdata...'):
   df['Target'] = df['close'].shift(-1)
   df = df.dropna().reset_index(drop=True)
 
+# Zuivere lijst met uitsluitend echte markt- en sentimentindicatoren
 features = [
     'close',
     'open',
     'high',
     'low',
     'volume',
-    'taker_buy_ratio',
     'VWAP_distance',
     'BB_pct_b',
     'ATR',
@@ -181,14 +178,13 @@ current_price = realtime_price if realtime_price else float(df['close'].iloc[-1]
 current_atr = float(df['ATR'].iloc[-1])
 is_mtf_bullish = bool(df['mtf_trend_bullish'].iloc[-1])
 
-# Dynamische ATR-based Stop-Loss & Take-Profit
-stop_loss_long = current_price - (1.5 * current_atr)
-take_profit_long = current_price + (2.5 * current_atr)
+stop_loss_long = current_price - (2.0 * current_atr)
+take_profit_long = current_price + (3.5 * current_atr)
 
 laatste_update = datetime.now().strftime('%H:%M:%S (%d-%m-%Y)')
 
 col1, col2, col3, col4, col5 = st.columns(5)
-col1.metric(f'Huidige {selected_asset.split("-")[0]} Koers', f'${current_price:,.3f}')
+col1.metric('Huidige BTC Koers', f'${current_price:,.2f}')
 col2.metric('Model Score ($R^2$)', f'{score:.2f}')
 col3.metric('Directional Win-Rate', f'{directional_acc:.1f}%')
 col4.metric(
@@ -198,28 +194,25 @@ col5.metric('Laatste Model Update', laatste_update)
 
 st.markdown('---')
 
-# Risico & Trade setup sectie
-st.subheader('🛡️ Dynamisch Risico & ATR Levels')
+st.subheader('🛡️ Dagelijks Risico & ATR Levels (Daily)')
 r_col1, r_col2, r_col3 = st.columns(3)
-r_col1.metric('Huidige ATR (Volatiliteit)', f'${current_atr:.4f}')
-r_col2.metric('Voorbeeld Stop-Loss (Long)', f'${stop_loss_long:,.3f}')
-r_col3.metric('Voorbeeld Take-Profit (Long)', f'${take_profit_long:,.3f}')
+r_col1.metric('Huidige ATR (Volatiliteit)', f'${current_atr:,.2f}')
+r_col2.metric('Voorbeeld Stop-Loss (Long)', f'${stop_loss_long:,.2f}')
+r_col3.metric('Voorbeeld Take-Profit (Long)', f'${take_profit_long:,.2f}')
 
 st.markdown('---')
 
-# SHAP Explainer sectie
 st.subheader('🔍 Model Explainability (SHAP Values)')
 try:
-  explainer = shap.Explainer(model, X_test)
-  shap_values = explainer(X_test)
+  X_sample = X_test.tail(30)
+  explainer = shap.Explainer(model, X_sample)
+  shap_values = explainer(X_sample)
   fig, ax = plt.subplots(figsize=(10, 4))
   shap.plots.beeswarm(shap_values, max_display=8, show=False)
   st.pyplot(fig)
 except Exception as e:
-  st.info(
-      'SHAP plot kan tijdelijk niet worden gerenderd op deze dataset-omvang.'
-  )
+  st.info('SHAP plot kon niet worden geladen.')
 
 st.markdown('---')
-st.subheader('📈 Laatste Koersverloop')
+st.subheader('📈 Laatste Koersverloop (Daily)')
 st.line_chart(df[['close', 'SMA_20']].tail(100))
