@@ -8,3 +8,4 @@ pyarrow
 requests
 pytrends
 shap
+matplotlib
