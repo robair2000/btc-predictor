@@ -214,9 +214,9 @@ test_size = st.sidebar.slider(
     'Test / Train Splitsing (%)', 10, 40, 20, step=5
 )
 n_estimators = st.sidebar.slider(
-    'XGBoost Bomen (n_estimators)', 50, 300, 100, step=50
+    'XGBoost Bomen (n_estimators)', 50, 300, 150, step=50
 )
-max_depth = st.sidebar.slider('Maximale Boomdiepte (max_depth)', 3, 10, 3)
+max_depth = st.sidebar.slider('Maximale Boomdiepte (max_depth)', 3, 10, 4)
 
 features = [
     'close',
